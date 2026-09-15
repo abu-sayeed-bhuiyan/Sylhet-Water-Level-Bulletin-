@@ -1,6 +1,4 @@
 streamlit
-reportlab
 streamlit-gsheets
+reportlab
 pandas
-reportlab
-streamlit-gsheets
