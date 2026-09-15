@@ -28,7 +28,7 @@ STATIONS_META = [
     (17, "Khowai", "Habiganj", "HABIGANJ", 9.00),
 ]
 
-raw_data = st.text_area("কাঁচা ডাটা পেস্ট করুন:", height=180, placeholder="Kan*150926*1050*1021*1016*0.0\n...")
+raw_data = st.text_area("please insert field data from GR", height=180, placeholder="Kan*150926*1050*1021*1016*0.0\n...")
 
 if st.button("Generate Bulletin & PDF"):
     if not raw_data.strip():
