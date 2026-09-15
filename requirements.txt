@@ -3,3 +3,4 @@ reportlab
 streamlit-gsheets
 pandas
 reportlab
+streamlit-gsheets
