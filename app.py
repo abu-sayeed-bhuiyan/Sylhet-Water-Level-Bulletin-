@@ -128,4 +128,77 @@ if st.button("Generate Bulletin & PDF"):
             data=pdf_buffer.getvalue(),
             file_name=f"Water_Level_Bulletin_{report_date.replace('/', '')}.pdf",
             mime="application/pdf"
-        )
+        ) 
+        import streamlit as st
+import pandas as pd
+from streamlit_gsheets import GSheetsConnection
+
+# ১. গুগল শিট কানেকশন
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# ১৭টি স্টেশনের নামের তালিকা
+STATIONS = [
+    "Kanaighat", "Sylhet", "Sunamganj", "Chhatak", "Sheola", 
+    "Sherpur", "Markuli", "Latu", "Jaflong", "Lalakhal", 
+    "Companyganj", "Ballah", "Habiganj", "Moulvibazar", 
+    "Manu Rly Br", "Kamalganj", "Sreemangal"
+]
+
+st.title("Water Level Bulletin Tool")
+
+# --- ডাটা ইনপুট ও বুলেটিন সেকশন ---
+st.header("১. ডাটা ইনপুট ও সেভ করুন")
+
+input_date = st.date_input("তারিখ নির্বাচন করুন")
+selected_station_input = st.selectbox("স্টেশন নির্বাচন করুন (ইনপুটের জন্য)", STATIONS)
+water_level_input = st.number_input("Water Level (m)", format="%.2f")
+danger_level_input = st.number_input("Danger Level (m)", format="%.2f")
+
+# Raw Data Text Area (আপনার চাওয়া অনুযায়ী)
+raw_data = st.text_area("Please Insert Raw data from GR", height=150)
+
+# ডাটা সেভ করার বাটন
+if st.button("Save Data to Archive"):
+    new_data = pd.DataFrame([{
+        "Date": str(input_date),
+        "Station": selected_station_input,
+        "Water Level": water_level_input,
+        "Danger Level": danger_level_input
+    }])
+    
+    # বিদ্যমান ডাটা পড়ে নতুন ডাটা যোগ করা
+    existing_data = conn.read(ttl=0)
+    updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+    conn.update(data=updated_df)
+    st.success(f"{selected_station_input} স্টেশনের {input_date} তারিখের ডাটা সফলভাবে সেভ হয়েছে!")
+
+st.divider()
+
+# --- ইতিহাস সার্চ সেকশন (Search Archive) ---
+st.header("২. সংরক্ষিত ডাটা সার্চ করুন (Archive Search)")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    search_station = st.selectbox("স্টেশন নির্বাচন করুন (সার্চের জন্য)", STATIONS)
+
+with col2:
+    search_date = st.date_input("তারিখ নির্বাচন করুন (সার্চের জন্য)")
+
+if st.button("Search Water Level"):
+    # শিট থেকে ডাটা রিড করা
+    df = conn.read(ttl="10m")
+    
+    if not df.empty:
+        # ফিল্টার করা (তারিখ ও স্টেশন অনুযায়ী)
+        df['Date'] = df['Date'].astype(str)
+        filtered_df = df[(df['Station'] == search_station) & (df['Date'] == str(search_date))]
+        
+        if not filtered_df.empty:
+            st.write(f"### 📍 {search_station} স্টেশনের ফলাফল ({search_date}):")
+            st.dataframe(filtered_df[['Date', 'Station', 'Water Level', 'Danger Level']], use_container_width=True)
+        else:
+            st.warning(f"⚠️ {search_station} স্টেশনের জন্য {search_date} তারিখে কোনো সংরক্ষিত ডাটা পাওয়া যায়নি।")
+    else:
+        st.info("এখনো কোনো ডাটা সেভ করা হয়নি।")
+
