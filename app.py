@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
-import re
 from datetime import date
 from io import BytesIO
 from streamlit_gsheets import GSheetsConnection
 
 # ReportLab libraries for PDF Generation
 from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -20,31 +19,44 @@ st.set_page_config(page_title="Hydrological Bulletin Generator", layout="wide")
 st.title("Daily Water Level Bulletin Generator")
 
 # ---------------------------------------------------------
-# ২. ১৭টি স্টেশনের মাস্টার লিস্ট (ছবি অনুযায়ী)
+# ২. ১৭টি স্টেশনের মাস্টার লিস্ট
 # ---------------------------------------------------------
 STATION_MASTER_DATA = [
-    {"SL": 1,  "River": "Surma",        "Station": "Kanaighat(Knt)",       "Code": "KNT", "DL": 12.75},
-    {"SL": 2,  "River": "Surma",        "Station": "Sylhet Sadar(Syl)",    "Code": "SYL", "DL": 10.80},
-    {"SL": 3,  "River": "Surma",        "Station": "Chhatak(Cht)",         "Code": "CHH", "DL": 8.70},
-    {"SL": 4,  "River": "Surma",        "Station": "Sunamganj(Sun)",       "Code": "SUN", "DL": 7.80},
-    {"SL": 5,  "River": "Surma",        "Station": "Dirai(Dir)",           "Code": "DIR", "DL": 6.55},
-    {"SL": 6,  "River": "Kushiyara",     "Station": "Amalshid(Ams)",        "Code": "AMS", "DL": 15.40},
-    {"SL": 7,  "River": "Kushiyara",     "Station": "Sheola(Shl)",          "Code": "SHL", "DL": 13.05},
-    {"SL": 8,  "River": "Kushiyara",     "Station": "Sherpur(Shr)",         "Code": "SHR", "DL": 8.85},
-    {"SL": 9,  "River": "Manu",         "Station": "Manu Rly Bridge(Mnr)", "Code": "MNR", "DL": 17.55},
-    {"SL": 10, "River": "Manu",         "Station": "Moulvibazar Sadar(Moi)","Code": "MOI", "DL": 11.30},
-    {"SL": 11, "River": "Dhalai",       "Station": "Kamalganj(Kmg)",       "Code": "KMG", "DL": 19.35},
-    {"SL": 12, "River": "Jadukata",     "Station": "Laurergor(Sak)",       "Code": "SAK", "DL": 8.00},
-    {"SL": 13, "River": "Piyan",        "Station": "Jaflong(Jaf)",         "Code": "JAF", "DL": 13.00},
-    {"SL": 14, "River": "Sari-Gowain",  "Station": "Sarighat(Srg)",        "Code": "SRG", "DL": 12.35},
-    {"SL": 15, "River": "Sari-Gowain",  "Station": "Gowainghat(Gow)",      "Code": "GOW", "DL": 10.82},
-    {"SL": 16, "River": "Khowai",       "Station": "Balla",                "Code": "BAL", "DL": 21.20},
-    {"SL": 17, "River": "Khowai",       "Station": "Habiganj",             "Code": "HAB", "DL": 9.00},
+    {"SL": 1,  "River": "Surma",        "Station": "Kanaighat(Knt)",       "Keys": ["KNT", "KANAIGHAT"], "DL": 12.75},
+    {"SL": 2,  "River": "Surma",        "Station": "Sylhet Sadar(Syl)",    "Keys": ["SYL", "SYLHET"], "DL": 10.80},
+    {"SL": 3,  "River": "Surma",        "Station": "Chhatak(Cht)",         "Keys": ["CHH", "CHHATAK"], "DL": 8.70},
+    {"SL": 4,  "River": "Surma",        "Station": "Sunamganj(Sun)",       "Keys": ["SUN", "SUNAMGANJ"], "DL": 7.80},
+    {"SL": 5,  "River": "Surma",        "Station": "Dirai(Dir)",           "Keys": ["DIR", "DIRAI"], "DL": 6.55},
+    {"SL": 6,  "River": "Kushiyara",     "Station": "Amalshid(Ams)",        "Keys": ["AMS", "AMALSHID"], "DL": 15.40},
+    {"SL": 7,  "River": "Kushiyara",     "Station": "Sheola(Shl)",          "Keys": ["SHL", "SHEOLA"], "DL": 13.05},
+    {"SL": 8,  "River": "Kushiyara",     "Station": "Sherpur(Shr)",         "Keys": ["SHR", "SHERPUR"], "DL": 8.85},
+    {"SL": 9,  "River": "Manu",         "Station": "Manu Rly Bridge(Mnr)", "Keys": ["MNR", "MANU"], "DL": 17.55},
+    {"SL": 10, "River": "Manu",         "Station": "Moulvibazar Sadar(Moi)","Keys": ["MOI", "MOULVIBAZAR", "AMA"], "DL": 11.30},
+    {"SL": 11, "River": "Dhalai",       "Station": "Kamalganj(Kmg)",       "Keys": ["KMG", "KAMALGANJ"], "DL": 19.35},
+    {"SL": 12, "River": "Jadukata",     "Station": "Laurergor(Sak)",       "Keys": ["SAK", "LAURERGOR"], "DL": 8.00},
+    {"SL": 13, "River": "Piyan",        "Station": "Jaflong(Jaf)",         "Keys": ["JAF", "JAFLONG"], "DL": 13.00},
+    {"SL": 14, "River": "Sari-Gowain",  "Station": "Sarighat(Srg)",        "Keys": ["SRG", "SARIGHAT", "SAG"], "DL": 12.35},
+    {"SL": 15, "River": "Sari-Gowain",  "Station": "Gowainghat(Gow)",      "Keys": ["GOW", "GOWAINGHAT"], "DL": 10.82},
+    {"SL": 16, "River": "Khowai",       "Station": "Balla",                "Keys": ["BAL", "BALLA"], "DL": 21.20},
+    {"SL": 17, "River": "Khowai",       "Station": "Habiganj",             "Keys": ["HAB", "HABIGANJ"], "DL": 9.00},
 ]
 
 # ---------------------------------------------------------
-# ৩. কাঁচা ডাটা (GR Data) পার্সিং ফাংশন
+# ৩. ডাটা প্রসেসিং ও ইউনিটের সঠিকতা নিশ্চিত করা
 # ---------------------------------------------------------
+def process_wl_val(val_str):
+    try:
+        val = float(val_str)
+        if val <= 0:
+            return None
+        # যদি সেমি-মিটারে থাকে (যেমন ৬৩৬ সেমি = ৬.৩৬ মি)
+        if val > 50:
+            return round(val / 100.0, 2)
+        # যদি আগেই মিটারে থাকে (যেমন ৬.৩৬ মি)
+        return round(val, 2)
+    except ValueError:
+        return None
+
 def parse_raw_sms(text):
     data_map = {}
     lines = text.strip().split('\n')
@@ -55,10 +67,11 @@ def parse_raw_sms(text):
         if len(parts) >= 5:
             st_code = parts[0].upper()
             try:
-                wl_6pm = float(parts[2]) / 100.0 if parts[2] != '0' else None
-                wl_6am = float(parts[3]) / 100.0 if parts[3] != '0' else None
-                wl_9am = float(parts[4]) / 100.0 if parts[4] != '0' else None
-                rf = float(parts[5]) if len(parts) > 5 else 0.0
+                wl_6pm = process_wl_val(parts[2])
+                wl_6am = process_wl_val(parts[3])
+                wl_9am = process_wl_val(parts[4])
+                
+                rf = float(parts[5]) if len(parts) > 5 and parts[5] != '' else 0.0
                 
                 data_map[st_code] = {
                     "wl_6pm": wl_6pm,
@@ -71,18 +84,23 @@ def parse_raw_sms(text):
     return data_map
 
 # ---------------------------------------------------------
-# ৪. বুলেটিন ডাটাফ্রেম তৈরির ফাংশন
+# ৪. বুলেটিন ডাটাফ্রেম তৈরি
 # ---------------------------------------------------------
 def build_bulletin_df(parsed_map, selected_date):
     rows = []
     for item in STATION_MASTER_DATA:
-        code = item["Code"]
         sl = item["SL"]
         river = item["River"]
         st_name = item["Station"]
         dl = item["DL"]
+        keys = item["Keys"]
         
-        info = parsed_map.get(code, {})
+        info = {}
+        for k in keys:
+            if k in parsed_map:
+                info = parsed_map[k]
+                break
+                
         wl_6pm = info.get("wl_6pm", None)
         wl_9am = info.get("wl_9am", None)
         rf = info.get("rainfall", "-")
@@ -105,18 +123,18 @@ def build_bulletin_df(parsed_map, selected_date):
             "SL": sl,
             "River": river,
             "Station": st_name,
-            "WL Prev Day 06.00 PM(m)": wl_6pm if wl_6pm is not None else "-",
-            "WL Today 09.00 AM(m)": wl_9am if wl_9am is not None else "-",
+            "WL Prev Day 06.00 PM(m)": f"{wl_6pm:.2f}" if wl_6pm is not None else "-",
+            "WL Today 09.00 AM(m)": f"{wl_9am:.2f}" if wl_9am is not None else "-",
             "Trend": trend,
             "Danger Level (m)": f"{dl:.2f}",
             "Status vs DL (m)": f"{status_vs_dl:+.2f}" if status_vs_dl is not None else "-",
-            "Rainfall (mm)": rf,
+            "Rainfall (mm)": str(rf),
             "Date": str(selected_date)
         })
     return pd.DataFrame(rows)
 
 # ---------------------------------------------------------
-# ৫. PDF জেনারেট করার ফাংশন
+# ৫. PDF জেনারেট (স্মার্ট টেক্সট র্যাপিং সহ)
 # ---------------------------------------------------------
 def generate_pdf(df, rep_date):
     buffer = BytesIO()
@@ -126,53 +144,60 @@ def generate_pdf(df, rep_date):
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
-        'TitleStyle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=14,
-        alignment=1,
-        spaceAfter=4
+        'TitleStyle', parent=styles['Heading1'],
+        fontName='Helvetica-Bold', fontSize=14, alignment=1, spaceAfter=4
     )
     subtitle_style = ParagraphStyle(
-        'SubTitleStyle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        alignment=1,
-        spaceAfter=10
+        'SubTitleStyle', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=9, alignment=1, spaceAfter=10
+    )
+    cell_style = ParagraphStyle(
+        'CellStyle', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8, alignment=1
+    )
+    header_style = ParagraphStyle(
+        'HeaderStyle', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=8, alignment=1
     )
     
     elements.append(Paragraph("Daily Water Level Bulletin", title_style))
     elements.append(Paragraph(f"Date: {rep_date.strftime('%d/%m/%Y')}, Report Time: 09:00 AM", subtitle_style))
     
-    # PDF এর জন্য টেবিল ডাটা প্রস্তুতকরণ
-    headers = ["SL", "River", "Station", "WL Prev Day\n06.00 PM(m)", "WL Today\n09.00 AM(m)", "Trend", "Danger Level\n(m)", "Status vs\nDL (m)", "Rainfall\n(mm)"]
+    raw_headers = ["SL", "River", "Station", "WL Prev Day<br/>06.00 PM(m)", "WL Today<br/>09.00 AM(m)", "Trend", "Danger Level<br/>(m)", "Status vs<br/>DL (m)", "Rainfall<br/>(mm)"]
+    headers = [Paragraph(h, header_style) for h in raw_headers]
+    
     table_data = [headers]
     
     for idx, row in df.iterrows():
         table_data.append([
-            str(row["SL"]),
-            row["River"],
-            row["Station"],
-            str(row["WL Prev Day 06.00 PM(m)"]),
-            str(row["WL Today 09.00 AM(m)"]),
-            row["Trend"],
-            str(row["Danger Level (m)"]),
-            str(row["Status vs DL (m)"]),
-            str(row["Rainfall (mm)"])
+            Paragraph(str(row["SL"]), cell_style),
+            Paragraph(str(row["River"]), cell_style),
+            Paragraph(str(row["Station"]), cell_style),
+            Paragraph(str(row["WL Prev Day 06.00 PM(m)"]), cell_style),
+            Paragraph(str(row["WL Today 09.00 AM(m)"]), cell_style),
+            Paragraph(str(row["Trend"]), cell_style),
+            Paragraph(str(row["Danger Level (m)"]), cell_style),
+            Paragraph(str(row["Status vs DL (m)"]), cell_style),
+            Paragraph(str(row["Rainfall (mm)"]), cell_style)
         ])
         
-    t = Table(table_data, colWidths=[30, 85, 130, 80, 80, 55, 75, 75, 55])
-    t.setStyle(TableStyle([
+    t_style = [
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-    ]))
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        # এক নদীর জন্য সেল মার্জিং
+        ('SPAN', (1, 1), (1, 5)),   # Surma
+        ('SPAN', (1, 6), (1, 8)),   # Kushiyara
+        ('SPAN', (1, 9), (1, 10)),  # Manu
+        ('SPAN', (1, 14), (1, 15)), # Sari-Gowain
+        ('SPAN', (1, 16), (1, 17)), # Khowai
+    ]
+
+    t = Table(table_data, colWidths=[30, 85, 130, 80, 80, 55, 75, 75, 55])
+    t.setStyle(TableStyle(t_style))
     
     elements.append(t)
     doc.build(elements)
@@ -180,7 +205,7 @@ def generate_pdf(df, rep_date):
     return buffer
 
 # ---------------------------------------------------------
-# ৬. ইন্টারফেস ও ইউজার ইনপুট
+# ৬. ইউজার ইন্টারফেস
 # ---------------------------------------------------------
 st.header("১. কাঁচা ডাটা প্রবেশ করুন ও বুলেটিন তৈরি করুন")
 
@@ -204,7 +229,6 @@ if 'bulletin_df' in st.session_state:
     st.write("### তৈরি হওয়া বুলেটিন:")
     st.dataframe(df_to_show, use_container_width=True)
     
-    # PDF ডাউনলোড বাটন
     pdf_data = generate_pdf(df_to_show, report_date)
     st.download_button(
         label="📄 Download PDF Bulletin",
@@ -233,7 +257,7 @@ with col2:
             st.warning("⚠️ আগে 'Generate Bulletin & PDF' বাটনে চাপ দিয়ে বুলেটিন তৈরি করুন!")
 
 # ---------------------------------------------------------
-# ৭. সংরক্ষিত ডাটা সার্চ সেকশন
+# ৭. সংরক্ষিত ডাটা সার্চ
 # ---------------------------------------------------------
 st.divider()
 st.header("২. সংরক্ষিত ডাটা সার্চ করুন (Archive Search)")
@@ -262,4 +286,4 @@ if st.button("Search Water Level"):
             st.info("আর্কাইভে এখনো কোনো ডাটা নেই।")
     except Exception as e:
         st.error(f"ডাটা লোড করতে সমস্যা হয়েছে: {e}")
-          
+ 
