@@ -1,2 +1,5 @@
 streamlit
 reportlab
+streamlit-gsheets
+pandas
+reportlab
