@@ -19,21 +19,21 @@ st.set_page_config(page_title="Hydrological Bulletin Generator", layout="wide")
 st.title("Daily Water Level Bulletin Generator")
 
 # ---------------------------------------------------------
-# ২. ১৭টি স্টেশনের মাস্টার লিস্ট
+# ২. ১৭টি স্টেশনের মাস্টার লিস্ট ও তাদের বিভিন্ন উপনাম
 # ---------------------------------------------------------
 STATION_MASTER_DATA = [
-    {"SL": 1,  "River": "Surma",        "Station": "Kanaighat(Knt)",       "Keys": ["KNT", "KANAIGHAT"], "DL": 12.75},
+    {"SL": 1,  "River": "Surma",        "Station": "Kanaighat(Knt)",       "Keys": ["KNT", "KANAIGHAT", "KANAI"], "DL": 12.75},
     {"SL": 2,  "River": "Surma",        "Station": "Sylhet Sadar(Syl)",    "Keys": ["SYL", "SYLHET"], "DL": 10.80},
-    {"SL": 3,  "River": "Surma",        "Station": "Chhatak(Cht)",         "Keys": ["CHH", "CHHATAK"], "DL": 8.70},
+    {"SL": 3,  "River": "Surma",        "Station": "Chhatak(Cht)",         "Keys": ["CHH", "CHT", "CHHATAK"], "DL": 8.70},
     {"SL": 4,  "River": "Surma",        "Station": "Sunamganj(Sun)",       "Keys": ["SUN", "SUNAMGANJ"], "DL": 7.80},
     {"SL": 5,  "River": "Surma",        "Station": "Dirai(Dir)",           "Keys": ["DIR", "DIRAI"], "DL": 6.55},
     {"SL": 6,  "River": "Kushiyara",     "Station": "Amalshid(Ams)",        "Keys": ["AMS", "AMALSHID"], "DL": 15.40},
     {"SL": 7,  "River": "Kushiyara",     "Station": "Sheola(Shl)",          "Keys": ["SHL", "SHEOLA"], "DL": 13.05},
     {"SL": 8,  "River": "Kushiyara",     "Station": "Sherpur(Shr)",         "Keys": ["SHR", "SHERPUR"], "DL": 8.85},
     {"SL": 9,  "River": "Manu",         "Station": "Manu Rly Bridge(Mnr)", "Keys": ["MNR", "MANU"], "DL": 17.55},
-    {"SL": 10, "River": "Manu",         "Station": "Moulvibazar Sadar(Moi)","Keys": ["MOI", "MOULVIBAZAR", "AMA"], "DL": 11.30},
+    {"SL": 10, "River": "Manu",         "Station": "Moulvibazar Sadar(Moi)","Keys": ["MOI", "MOULVIBAZAR", "MOULVI", "AMA"], "DL": 11.30},
     {"SL": 11, "River": "Dhalai",       "Station": "Kamalganj(Kmg)",       "Keys": ["KMG", "KAMALGANJ"], "DL": 19.35},
-    {"SL": 12, "River": "Jadukata",     "Station": "Laurergor(Sak)",       "Keys": ["SAK", "LAURERGOR"], "DL": 8.00},
+    {"SL": 12, "River": "Jadukata",     "Station": "Laurergor(Sak)",       "Keys": ["SAK", "LAURERGOR", "LAURER"], "DL": 8.00},
     {"SL": 13, "River": "Piyan",        "Station": "Jaflong(Jaf)",         "Keys": ["JAF", "JAFLONG"], "DL": 13.00},
     {"SL": 14, "River": "Sari-Gowain",  "Station": "Sarighat(Srg)",        "Keys": ["SRG", "SARIGHAT", "SAG"], "DL": 12.35},
     {"SL": 15, "River": "Sari-Gowain",  "Station": "Gowainghat(Gow)",      "Keys": ["GOW", "GOWAINGHAT"], "DL": 10.82},
@@ -42,17 +42,16 @@ STATION_MASTER_DATA = [
 ]
 
 # ---------------------------------------------------------
-# ৩. ডাটা প্রসেসিং ও ইউনিটের সঠিকতা নিশ্চিত করা
+# ৩. পার্সিং লজিক (নিখুঁত ম্যাচিং ও মান ফিল্টারিং)
 # ---------------------------------------------------------
 def process_wl_val(val_str):
     try:
         val = float(val_str)
         if val <= 0:
             return None
-        # যদি সেমি-মিটারে থাকে (যেমন ৬৩৬ সেমি = ৬.৩৬ মি)
+        # সেন্টিমিটারকে মিটারে রূপান্তর (যেমন ৬৩৬ সেমি = ৬.৩৬ মি)
         if val > 50:
             return round(val / 100.0, 2)
-        # যদি আগেই মিটারে থাকে (যেমন ৬.৩৬ মি)
         return round(val, 2)
     except ValueError:
         return None
@@ -61,11 +60,13 @@ def parse_raw_sms(text):
     data_map = {}
     lines = text.strip().split('\n')
     for line in lines:
-        if not line.strip():
+        line_clean = line.strip()
+        if not line_clean:
             continue
-        parts = [p.strip() for p in line.split('*')]
+        parts = [p.strip() for p in line_clean.split('*')]
         if len(parts) >= 5:
-            st_code = parts[0].upper()
+            # প্রথম শব্দ থেকে যেকোনো স্পেশাল ক্যারেক্টার বাদ দিয়ে শুধু ইংরেজি অক্ষর ও সংখ্যা নেওয়া
+            st_code = ''.join(e for e in parts[0] if e.isalnum()).upper()
             try:
                 wl_6pm = process_wl_val(parts[2])
                 wl_6am = process_wl_val(parts[3])
@@ -96,9 +97,13 @@ def build_bulletin_df(parsed_map, selected_date):
         keys = item["Keys"]
         
         info = {}
-        for k in keys:
-            if k in parsed_map:
-                info = parsed_map[k]
+        # নাম ম্যাচিং করার ফ্লেক্সিবল লজিক
+        for parsed_code, parsed_info in parsed_map.items():
+            for key in keys:
+                if key == parsed_code or parsed_code.startswith(key) or key.startswith(parsed_code):
+                    info = parsed_info
+                    break
+            if info:
                 break
                 
         wl_6pm = info.get("wl_6pm", None)
@@ -134,7 +139,7 @@ def build_bulletin_df(parsed_map, selected_date):
     return pd.DataFrame(rows)
 
 # ---------------------------------------------------------
-# ৫. PDF জেনারেট (স্মার্ট টেক্সট র্যাপিং সহ)
+# ৫. PDF জেনারেট করার ফাংশন
 # ---------------------------------------------------------
 def generate_pdf(df, rep_date):
     buffer = BytesIO()
@@ -188,7 +193,7 @@ def generate_pdf(df, rep_date):
         ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BOTTOMPADDING', (0,0), (-1,-1), 3),
         ('TOPPADDING', (0,0), (-1,-1), 3),
-        # এক নদীর জন্য সেল মার্জিং
+        # একই নদীর ঘরগুলোকে একত্রে মার্জ করা
         ('SPAN', (1, 1), (1, 5)),   # Surma
         ('SPAN', (1, 6), (1, 8)),   # Kushiyara
         ('SPAN', (1, 9), (1, 10)),  # Manu
@@ -257,7 +262,7 @@ with col2:
             st.warning("⚠️ আগে 'Generate Bulletin & PDF' বাটনে চাপ দিয়ে বুলেটিন তৈরি করুন!")
 
 # ---------------------------------------------------------
-# ৭. সংরক্ষিত ডাটা সার্চ
+# ৭. সংরক্ষিত ডাটা সার্চ সেকশন
 # ---------------------------------------------------------
 st.divider()
 st.header("২. সংরক্ষিত ডাটা সার্চ করুন (Archive Search)")
@@ -286,4 +291,4 @@ if st.button("Search Water Level"):
             st.info("আর্কাইভে এখনো কোনো ডাটা নেই।")
     except Exception as e:
         st.error(f"ডাটা লোড করতে সমস্যা হয়েছে: {e}")
- 
+                                
